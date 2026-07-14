@@ -10,10 +10,10 @@ which are separate PDFs that are analyzed for ad coverage like the paper itself.
 
 ## For office use
 
--Download Advertisatron-3000.zip
--Extract Advertisatron-3000 folder to desktop
--Enter api key in config.ini
--Run Advertisatron-300.exe
+Download Advertisatron-3000.zip. 
+Extract Advertisatron-3000 folder to desktop. 
+Enter api key in config.ini. 
+Run Advertisatron-300.exe. 
 
 ## Setup
 
