@@ -8,6 +8,13 @@ It can also include inserts of different sizes, priced
 from the publication data in `inserts_data.py`, and special sections
 which are separate PDFs that are analyzed for ad coverage like the paper itself.
 
+## For office use
+
+-Download Advertisatron-3000.zip
+-Extract Advertisatron-3000 folder to desktop
+-Enter api key in config.ini
+-Run Advertisatron-300.exe
+
 ## Setup
 
 1. Install Python 3.11+ (make sure "Add Python to PATH" is checked).
