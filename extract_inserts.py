@@ -1,0 +1,186 @@
+"""Build-time tool (NOT shipped in the exe).
+
+Reads the newspaper advertising Excel report and generates `inserts_data.py`, a
+plain-Python snapshot of each publication's page size and its list of inserts
+(advertiser + real page area in square inches). Re-run this whenever the Excel
+changes, then rebuild the exe.
+
+Usage:
+    python extract_inserts.py ["path\\to\\Advertising_Percentage_Report.xlsx"]
+
+Uses only the standard library (zipfile + xml) so it needs no openpyxl.
+"""
+
+import os
+import sys
+import zipfile
+import xml.etree.ElementTree as ET
+
+DEFAULT_XLSX = os.path.join(
+    os.path.expanduser("~"), "Desktop", "Advertising_Percentage_Report.xlsx"
+)
+OUT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inserts_data.py")
+
+M = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+
+def _load_shared_strings(z):
+    strings = []
+    if "xl/sharedStrings.xml" not in z.namelist():
+        return strings
+    root = ET.fromstring(z.read("xl/sharedStrings.xml"))
+    for si in root.findall(M + "si"):
+        strings.append("".join(t.text or "" for t in si.iter(M + "t")))
+    return strings
+
+
+def _sheet_map(z):
+    """Return {sheet_name: worksheet_xml_path} preserving workbook order."""
+    rels = ET.fromstring(z.read("xl/_rels/workbook.xml.rels"))
+    rid_to_target = {}
+    for rel in rels:
+        rid_to_target[rel.get("Id")] = rel.get("Target")
+    wb = ET.fromstring(z.read("xl/workbook.xml"))
+    R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    out = []
+    for s in wb.findall(M + "sheets/" + M + "sheet"):
+        name = s.get("name")
+        target = rid_to_target[s.get(R + "id")]
+        if not target.startswith("xl/"):
+            target = "xl/" + target.lstrip("/")
+        out.append((name, target))
+    return out
+
+
+def _grid(z, path, shared):
+    """Return {cell_ref: value_string} for one worksheet."""
+    root = ET.fromstring(z.read(path))
+    cells = {}
+    for c in root.iter(M + "c"):
+        ref = c.get("r")
+        t = c.get("t")
+        v = c.find(M + "v")
+        if v is not None and v.text is not None:
+            cells[ref] = shared[int(v.text)] if t == "s" else v.text
+        else:
+            is_el = c.find(M + "is")
+            if is_el is not None:
+                cells[ref] = "".join(x.text or "" for x in is_el.iter(M + "t"))
+    return cells
+
+
+def _col_of(ref):
+    return "".join(ch for ch in ref if ch.isalpha())
+
+
+def _row_of(ref):
+    return int("".join(ch for ch in ref if ch.isdigit()))
+
+
+def _to_float(val):
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_publication(cells):
+    """From one paper worksheet, return (paper_size_in2, inserts_list).
+
+    Structural parse: find each 'Advertiser / Item' header row, then read the
+    rows beneath it (name in col A, size in col C) until a 'Total…' row or a
+    blank name. The row whose name contains 'Newspaper' provides the paper size.
+    """
+    max_row = max((_row_of(r) for r in cells), default=0)
+    # rows that begin a section
+    header_rows = [
+        _row_of(ref)
+        for ref, val in cells.items()
+        if _col_of(ref) == "A" and str(val).strip().lower() == "advertiser / item"
+    ]
+
+    paper_size = None
+    inserts = []
+    seen = set()
+
+    for hr in sorted(header_rows):
+        r = hr + 1
+        while r <= max_row:
+            name = cells.get(f"A{r}")
+            if name is None or str(name).strip() == "":
+                break
+            name = str(name).strip()
+            if name.lower().startswith("total"):
+                break
+            size = _to_float(cells.get(f"C{r}"))
+            if "newspaper" in name.lower():
+                if size:
+                    paper_size = size
+            elif size and size > 0:
+                key = (name, round(size, 3))
+                if key not in seen:
+                    seen.add(key)
+                    inserts.append({"name": name, "size_in2": round(size, 3)})
+            r += 1
+
+    return paper_size, inserts
+
+
+def main():
+    xlsx = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_XLSX
+    if not os.path.exists(xlsx):
+        sys.exit(f"Excel file not found: {xlsx}")
+
+    z = zipfile.ZipFile(xlsx)
+    shared = _load_shared_strings(z)
+
+    publications = {}
+    for name, path in _sheet_map(z):
+        if name.strip().lower() == "summary":
+            continue
+        cells = _grid(z, path, shared)
+        paper_size, inserts = parse_publication(cells)
+        if not inserts and paper_size is None:
+            continue  # not a paper worksheet
+        publications[name] = {
+            "paper_size_in2": paper_size,
+            "inserts": inserts,
+        }
+
+    _write_module(publications, xlsx)
+    print(f"Wrote {OUT_PATH}")
+    for name, data in publications.items():
+        print(f"  {name}: paper={data['paper_size_in2']} in^2, "
+              f"{len(data['inserts'])} inserts")
+
+
+def _write_module(publications, xlsx):
+    lines = [
+        '"""Generated by extract_inserts.py — do not edit by hand.',
+        "",
+        f"Source: {os.path.basename(xlsx)}",
+        "Each publication has its paper page area (square inches) and a list of",
+        "inserts (advertiser name + real page area in square inches, 100% ad).",
+        '"""',
+        "",
+        "PUBLICATIONS = {",
+    ]
+    for name, data in publications.items():
+        lines.append(f"    {name!r}: {{")
+        lines.append(f"        \"paper_size_in2\": {data['paper_size_in2']!r},")
+        lines.append('        "inserts": [')
+        for ins in data["inserts"]:
+            lines.append(
+                f"            {{\"name\": {ins['name']!r}, "
+                f"\"size_in2\": {ins['size_in2']!r}}},"
+            )
+        lines.append("        ],")
+        lines.append("    },")
+    lines.append("}")
+    lines.append("")
+    with open(OUT_PATH, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
+if __name__ == "__main__":
+    main()

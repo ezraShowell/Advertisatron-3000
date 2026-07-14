@@ -1,0 +1,28 @@
+ADVERTISATRON-3000 — How to use
+=====================================
+
+1. Make sure all three items stay together in this folder:
+      - Advertisatron-3000.exe    (double-click this to start)
+      - config.ini                (don't delete — the app needs it)
+      - READ ME FIRST.txt         (this file)
+
+2. Double-click "Advertisatron-3000.exe".
+
+   The first time, Windows may show a blue box that says
+   "Windows protected your PC".  This is normal for a small app.
+   Click  "More info"  ->  "Run anyway".
+
+3. In the window that opens:
+      - Click "Choose PDF..."
+      - Pick a newspaper PDF
+      - Wait while it analyzes the pages (it shows "Analyzing page X of Y...")
+      - The advertising percentage appears, e.g. "Advertising: 27.4%"
+
+That's it.
+
+Notes
+-----
+- You need to be connected to the internet (the app checks the pages online).
+- Bigger papers take longer — about a second or two per page.
+- If you see a message about "config.ini", the config file was moved or
+  deleted; keep it in the same folder as the program.
