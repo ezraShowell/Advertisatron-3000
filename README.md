@@ -1,12 +1,12 @@
 # Advertisatron-3000 (v1.2)
 
-A bare-minimum Windows desktop app that takes a newspaper PDF and reports the
-percentage of the paper taken up by advertisements. It renders each page to an
+Windows desktop app that takes a newspaper PDF and reports the
+percentage of the paper taken up by advertisements. Renders each page to an
 image, asks the Claude Sonnet vision model to estimate that page's ad coverage,
-and combines the results into a single **area-weighted** overall percentage.
-It can also fold in **inserts** (advertiser flyers) of different sizes, priced
-from the publication data in `inserts_data.py`, and **special sections** —
-separate PDFs that are analyzed for ad coverage like the paper itself.
+and combines the results into an overall percentage.
+It can also include inserts of different sizes, priced
+from the publication data in `inserts_data.py`, and special sections
+which are separate PDFs that are analyzed for ad coverage like the paper itself.
 
 ## Setup
 
